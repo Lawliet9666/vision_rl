@@ -1,126 +1,39 @@
-# Task 001: DiffCVaR Reproduction Audit and JAX Baselines
+# Task 001: Reproduce DiffCVaR-GNN and Compare with MLP
 
-## Purpose
+## Goal
 
-Establish a traceable reproduction baseline for the [DiffCVaR paper](https://lawliet9666.github.io/rlcvarbf/) using the code in this repository. First map the paper's claims to the released implementation, then train and evaluate the two JAX MLP methods that this snapshot supports. The paper's proposed method uses a graph neural network (GNN); this repository currently dispatches only `diff_cvar_mlp` and `ppo_mlp`. Do not label MLP measurements as a reproduction of the paper's proposed GNN row.
+Add the GNN from the [DiffCVaR paper](https://arxiv.org/abs/2605.21257) to this JAX code. Compare it with the current `diff_cvar_mlp` policy using test results and videos. Does the GNN help the robot navigate better?
 
-This is a state-observation reproduction task. Image observations and a vision policy are future work.
+## Read First
 
-## Learning Goals
+- **CBFs:** [Ames et al.](http://ames.caltech.edu/ames2019control.pdf) and this [tutorial](https://arxiv.org/abs/2603.06954). Focus on the main idea; you can skip the dense derivations.
+- **Safety and risk:** [BarrierNet](https://arxiv.org/abs/2111.11277), [DiffCVaR](https://arxiv.org/pdf/2605.21257) (page 4 for the CVaR constraint; Sections IV–V for the GNN and tests), and [CVaR intuition](https://arxiv.org/pdf/2504.06513) (pages 2–3 and Figure 2).
+- **GNN examples:** [starter notebook](https://github.com/tkkim-robot/minimal-graph-attention-starter/blob/main/graph_attention_starter.ipynb), [GAT code](https://github.com/tkkim-robot/online_adaptive_cbf/blob/main/nn_model/penn/gat.py), and its [paper](https://arxiv.org/pdf/2504.03038) (page 7).
 
-- Set up the JAX environment and run a short training and evaluation smoke check.
-- Trace training configuration, model selection, checkpoint loading, and evaluation metrics to source code.
-- Distinguish a reproduced result from a related baseline and from an unavailable experiment.
-- Record seeds, checkpoint selection, hardware, commands, configuration, raw metrics, and failure modes so another person can rerun the experiment.
-- Use an issue, a task branch, small commits, and a PR for review.
+## What to Do
 
-## Reading and References
+1. Read the README. Find where observations become policy inputs in `env/jax_social_nav.py` and `model/jax_diff_cvar_mlp.py`, then find where `model/jax_cvar_qp.py` computes the safe action. The policy sees all obstacle slots; the QP chooses a smaller set of nearby obstacles.
+2. Follow the paper to build a graph from the robot, goal information, and all active obstacles. Use the three observation frames. Feed the GNN output to the policy so it still produces a nominal action and a risk level and safety margin for each obstacle. Inspect the slack variables, action bounds, and slack penalty for infeasiblity problem.
+3. Train the MLP and GNN with the same environment, training steps, and random seeds. Test both in the paper's 20-obstacle unicycle setting. Report success, collision, and timeout rates; total reward; travel time; and closest distance to an obstacle. Include the settings, seeds, and checkpoints you used.
+4. Compare the two policies on the same navigation scenarios. Use the videos to show how they avoid obstacles and why representative runs succeed or fail.
 
-- [Paper and project page](https://lawliet9666.github.io/rlcvarbf/) — especially Section V, Table I, Figure 2, Table II, and Table III.
-- [`main_jax` source branch](https://github.com/anonymousrobotics9666/Reinforcement-Learning-Adaptive-CVaR-Barrier-Function/tree/main_jax), imported here from commit `291c9162dae8ed04c070364a94a5a586f720ce95`.
-- `README.md`, `config/`, `scripts/run_ppo.sh`, `scripts/eval.py`, `model/__init__.py`, and `trainer/jax_ppo_eval.py` in this repository.
+## Answer These Questions in the PR
 
-## What the Starting Code Supports
+Answer each question briefly. Point to the relevant code, configuration, or test result.
 
-`model/__init__.py` selects `diff_cvar_mlp` or `ppo_mlp`. The default configuration uses the unicycle robot, 20 dynamic obstacles, a 0.1 s time step, and 400 steps per episode. `scripts/eval.py` can evaluate a JAX `.pkl` checkpoint with ten default seed groups and 50 episodes per group, reporting return, success, collision, timeout, successful trajectory time, and successful minimum clearance.
+1. **Graph input:** What are the robot, obstacle, and goal node features? The edge definition. Explain the input dimensions and main branch in this [code](https://github.com/anonymousrobotics9666/Reinforcement-Learning-Adaptive-CVaR-Barrier-Function), the difference
+2. **GNN design:** descript or draw the GNN structure with the parameter setting, e.g., size of each layer .
+3. **QP:** comapred with the original QP design of main branch in this [code](https://github.com/anonymousrobotics9666/Reinforcement-Learning-Adaptive-CVaR-Barrier-Function), what is the differnce, e.g., action limit, slack variable, constraint setting, how the qp related parameter ranges are set
+4. **Reward:** explain reward design and related parameter setting.
+5. **Output:** what is the output and how is it different from the final output of ppo mlp, explain the forward process and how the gradient information is passed
+6. **record Results :** record your training results in a table like the paper does compare it with the diffcvar_mlp and ppo_mlp and save the corresponding video. explain the trajectory in the video.
 
-No checkpoint is tracked in this repository. The paper's Diff-CVaR-GNN, its other comparison methods, and its ablations are not present in this source snapshot. Record each missing method or artifact in the audit; do not substitute an MLP result without naming the difference.
+## Submit Your Work
 
-## Repository Locations
+1. Fork the repository to your personal GitHub account.
+2. Create a development branch in your fork.
+3. Commit changes regularly with clear messages.
+4. Open a PR from that branch into your fork’s `main`.
+5. Answer every **Task 001** question in the PR description. Include code links, results, and videos.
+6. Email us the PR link for review.
 
-Put the task report, experiment matrix, commands, and small result tables in:
-
-```text
-experiments/exp_001_paper_reproduction/README.md
-```
-
-Put reusable scripts added for this task under `scripts/`. Keep machine-specific checkpoints and W&B logs under ignored `outputs/` and `wandb/`. Include a small, machine-readable summary under `experiments/exp_001_paper_reproduction/` if useful; do not commit large checkpoints or generated video files.
-
-## GitHub Workflow
-
-1. Open an issue titled `Task 001: DiffCVaR reproduction audit and JAX baselines`. State the hardware, proposed experiment matrix, estimated compute budget, and the result that will count as a successful check-in.
-2. Create `task-001-paper-reproduction` from `main`. Do not push assignment work directly to `main`.
-3. Make small commits for the audit, smoke check, each model run, and the report. Push the task branch so the commits are visible for review.
-4. Open a PR with **base** `main` and **compare** `task-001-paper-reproduction`. Link the issue. The instructor can review and request changes without merging.
-
-## Work Plan
-
-### 1. Audit the paper against the source
-
-Create a matrix with one row per paper result: Table I, Figure 2, Table II, and Table III. For each, list the model/baselines, scenario, obstacle count, metrics, matching code/config/checkpoint, and status: runnable, requires implementation, or missing artifact. Confirm the distinction between the paper's GNN policy and this branch's MLP policies from `model/__init__.py` and the paper's Section V.
-
-### 2. Verify the local environment
-
-Follow the root README. Record Python, JAX, Optax, and device versions. Run a short smoke training job for each model before committing to full runs. Show that a checkpoint is written and that `scripts/eval.py` can load it. If a command fails, include the exact command, error, and diagnosis in the report; do not silently change the experiment definition.
-
-### 3. Train the available baselines
-
-Train `diff_cvar_mlp` and `ppo_mlp` with the same unicycle and 20-obstacle environment settings. The default full training budget is `total_timesteps: 20000000` in `config/base.yaml`. Use offline W&B logging unless online tracking has been arranged. Record every override and the selected checkpoint step. If hardware limits prevent a full run, report the completed timestep budget and label the result as a partial run.
-
-```bash
-WANDB_MODE=offline RUN_NAME=task001_diff_cvar_mlp bash scripts/run_ppo.sh
-WANDB_MODE=offline RUN_NAME=task001_ppo_mlp bash scripts/run_ppo.sh model=ppo_mlp
-```
-
-### 4. Evaluate with a fixed protocol
-
-Evaluate each selected JAX checkpoint with seeds `100,200,...,1000` and 50 episodes per seed group (500 episodes total). Keep the saved run `config.yaml` with its checkpoint. Report success, collision, and timeout rates; average return; successful trajectory time; and successful minimum clearance. Check that success + collision + timeout is approximately 100%. State how any `mean ± std` values are aggregated. The existing evaluator pools episodes; do not present its episode-level standard deviation as a standard deviation over ten independent training runs.
-
-```bash
-python scripts/eval.py \
-  --save-dir outputs/crowd_dyn_var_num_env/runs/<run> \
-  --checkpoint outputs/crowd_dyn_var_num_env/runs/<run>/ckpt_<step>.pkl \
-  --seeds 100,200,300,400,500,600,700,800,900,1000 \
-  --episodes 50
-```
-
-Use the same evaluation protocol for both models. Report the run names and checkpoint paths, but do not include absolute paths specific to one computer in runnable instructions.
-
-### 5. Compare and explain
-
-Place the two measured MLP rows beside the relevant paper numbers, with explicit architecture labels. For context, the paper's Table I reports 58.2% success for Vanilla RL and 97.0% for the **GNN-based** proposed method in the 20-obstacle unicycle setting. Those paper rows are reference values, not pass thresholds for these MLP models. Explain any config, architecture, checkpoint, training-seed, or metric mismatch before interpreting a numerical difference. Finish the audit matrix with the work and artifacts needed to reproduce Figure 2, Table II, Table III, and all Table I baselines faithfully.
-
-## What to Submit in the PR
-
-- `experiments/exp_001_paper_reproduction/README.md` with the audit matrix, exact commands, environment/device versions, run configs, checkpoint steps, and a two-model results table.
-- Evidence of successful smoke training and checkpoint evaluation, or a clear failure record with reproduction steps.
-- Raw evaluation JSON or a small script and output that regenerates the reported metrics; omit large checkpoints.
-- A short answer to each question: Which paper rows are genuinely reproducible from this snapshot? How does MLP differ from the paper's GNN policy? What additional code or artifacts are required for full paper reproduction? How were seeds and standard deviations handled?
-
-## PR Description Template
-
-```markdown
-## Summary
-- Source commit and code changes:
-- Models and scenarios evaluated:
-
-## Reproduction audit
-- Paper results supported by this snapshot:
-- Missing implementations or artifacts:
-
-## Protocol
-- Hardware, Python/JAX/Optax versions:
-- Training commands, seeds, timestep budgets, and overrides:
-- Checkpoint selection and evaluation command:
-
-## Results
-| Model | Architecture | Episodes | Success % | Collision % | Timeout % | Avg. return | Traj. time | Min. clearance |
-| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| PPO | MLP | | | | | | | |
-| DiffCVaR | MLP | | | | | | | |
-
-## Interpretation and limits
-- Comparison to Table I:
-- Metric/architecture differences:
-- Work needed for full paper reproduction:
-
-## Checklist
-- [ ] Issue and task branch are linked
-- [ ] Commands and configs are recorded
-- [ ] Both available models were evaluated or failures are documented
-- [ ] Rates sum to approximately 100%
-- [ ] MLP results are not labeled as GNN results
-- [ ] PR targets `main`
-```
-
-The assignment is complete when another person can trace every reported number to a run, checkpoint, configuration, and evaluation command, and when unavailable paper results are clearly identified. A successful smoke check or MLP comparison alone is not a claim that the full paper has been reproduced.
